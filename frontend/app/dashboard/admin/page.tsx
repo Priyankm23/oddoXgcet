@@ -1,13 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plane, Plus, Mail, Briefcase, Building2, Calendar, User, Phone, MapPin, Globe, Heart, CreditCard, Shield, AlertCircle } from "lucide-react"
+import { Plane, Plus, Mail, Briefcase, Building2, Calendar, User, Phone, MapPin, Globe, Heart, CreditCard, Shield, AlertCircle, Copy, Eye, EyeOff } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
 
 interface Employee {
   id: string
@@ -117,53 +118,55 @@ export default function AdminDashboard() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [createdCredentials, setCreatedCredentials] = useState<{employee_id: string, password: string, work_email: string} | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
+
+  const fetchEmployees = async () => {
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch("http://127.0.0.1:8000/api/v1/employees/", {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      })
+      
+      if (response.ok) {
+          const data = await response.json()
+          
+          const mappedEmployees: Employee[] = data.map((emp: any) => ({
+            id: emp.id.toString(),
+            name: `${emp.first_name} ${emp.last_name}`,
+            email: emp.email,
+            image: emp.profile_picture || "/employee-avatar.png",
+            status: emp.status || "pending",
+            jobPosition: emp.designation || "N/A",
+            department: emp.department || "N/A",
+            dateOfJoining: emp.joining_date || "N/A",
+            dateOfBirth: emp.date_of_birth,
+            residingAddress: emp.address,
+            nationality: emp.nationality,
+            personalEmail: emp.personal_email,
+            gender: emp.gender,
+            maritalStatus: emp.marital_status,
+            mobile: emp.phone,
+            company: "TechCorp Inc.", // Placeholder
+            manager: emp.manager_id ? `Manager #${emp.manager_id}` : "N/A",
+            location: "N/A",
+            empCode: emp.employee_id
+          }))
+          setEmployees(mappedEmployees)
+      } else {
+          console.error("Failed to fetch employees:", response.statusText)
+      }
+    } catch (err: any) {
+      console.error("Error fetching employees:", err)
+      setError("Failed to load employees")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchEmployees = async () => {
-      try {
-        const token = localStorage.getItem("access_token")
-        const response = await fetch("http://localhost:8000/api/v1/employees/", {
-          headers: {
-            "Authorization": `Bearer ${token}`
-          }
-        })
-        
-        if (response.ok) {
-            const data = await response.json()
-            
-            const mappedEmployees: Employee[] = data.map((emp: any) => ({
-              id: emp.id.toString(),
-              name: `${emp.first_name} ${emp.last_name}`,
-              email: emp.email,
-              image: emp.profile_picture || "/employee-avatar.png",
-              status: emp.status || "pending",
-              jobPosition: emp.designation || "N/A",
-              department: emp.department || "N/A",
-              dateOfJoining: emp.joining_date || "N/A",
-              dateOfBirth: emp.date_of_birth,
-              residingAddress: emp.address,
-              nationality: emp.nationality,
-              personalEmail: emp.personal_email,
-              gender: emp.gender,
-              maritalStatus: emp.marital_status,
-              mobile: emp.phone,
-              company: "TechCorp Inc.", // Placeholder
-              manager: emp.manager_id ? `Manager #${emp.manager_id}` : "N/A",
-              location: "N/A",
-              empCode: emp.employee_id
-            }))
-            setEmployees(mappedEmployees)
-        } else {
-            console.error("Failed to fetch employees:", response.statusText)
-        }
-      } catch (err: any) {
-        console.error("Error fetching employees:", err)
-        setError("Failed to load employees")
-      } finally {
-        setLoading(false)
-      }
-    }
-    
     fetchEmployees()
   }, [])
 
@@ -183,10 +186,51 @@ export default function AdminDashboard() {
     setIsNewEmployeeOpen(true)
   }
 
-  const handleAddEmployee = () => {
-    // TODO: Implement add employee logic
-    console.log("Adding new employee:", newEmployeeData)
-    setIsNewEmployeeOpen(false)
+  const handleAddEmployee = async () => {
+    if (!newEmployeeData.name || !newEmployeeData.email || !newEmployeeData.jobPosition || !newEmployeeData.department || !newEmployeeData.mobile || !newEmployeeData.dateOfJoining) {
+      alert("Please fill all required fields")
+      return
+    }
+
+    const nameParts = newEmployeeData.name.trim().split(" ")
+    const firstName = nameParts[0]
+    const lastName = nameParts.slice(1).join(" ") || ""
+
+    const payload = {
+      first_name: firstName,
+      last_name: lastName,
+      work_email: newEmployeeData.email,
+      job_position: newEmployeeData.jobPosition,
+      department: newEmployeeData.department,
+      mobile: newEmployeeData.mobile,
+      joining_date: newEmployeeData.dateOfJoining
+    }
+
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch("http://127.0.0.1:8000/api/v1/employees/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setCreatedCredentials(data)
+        setIsNewEmployeeOpen(false)
+        setNewEmployeeData({})
+        fetchEmployees()
+      } else {
+        const errorData = await response.json()
+        alert(`Failed to create employee: ${errorData.detail}`)
+      }
+    } catch (err) {
+      console.error("Error creating employee:", err)
+      alert("An error occurred")
+    }
   }
 
   return (
@@ -524,160 +568,6 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </div>
-
-              <div className="space-y-4">
-                <h3 className="font-semibold text-lg">Personal Information</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="dateOfBirth">Date of Birth</Label>
-                    <Input
-                      id="dateOfBirth"
-                      type="date"
-                      value={newEmployeeData.dateOfBirth || ""}
-                      onChange={(e) => setNewEmployeeData({ ...newEmployeeData, dateOfBirth: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="gender">Gender</Label>
-                    <Input
-                      id="gender"
-                      placeholder="Male/Female/Other"
-                      value={newEmployeeData.gender || ""}
-                      onChange={(e) => setNewEmployeeData({ ...newEmployeeData, gender: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="nationality">Nationality</Label>
-                    <Input
-                      id="nationality"
-                      placeholder="e.g., American"
-                      value={newEmployeeData.nationality || ""}
-                      onChange={(e) => setNewEmployeeData({ ...newEmployeeData, nationality: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="maritalStatus">Marital Status</Label>
-                    <Input
-                      id="maritalStatus"
-                      placeholder="Single/Married"
-                      value={newEmployeeData.maritalStatus || ""}
-                      onChange={(e) => setNewEmployeeData({ ...newEmployeeData, maritalStatus: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2 col-span-2">
-                    <Label htmlFor="residingAddress">Residing Address</Label>
-                    <Input
-                      id="residingAddress"
-                      placeholder="Full address"
-                      value={newEmployeeData.residingAddress || ""}
-                      onChange={(e) => setNewEmployeeData({ ...newEmployeeData, residingAddress: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="personalEmail">Personal Email</Label>
-                    <Input
-                      id="personalEmail"
-                      type="email"
-                      placeholder="personal@email.com"
-                      value={newEmployeeData.personalEmail || ""}
-                      onChange={(e) => setNewEmployeeData({ ...newEmployeeData, personalEmail: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <h3 className="font-semibold text-lg">Company Information</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="company">Company</Label>
-                    <Input
-                      id="company"
-                      placeholder="Company name"
-                      value={newEmployeeData.company || ""}
-                      onChange={(e) => setNewEmployeeData({ ...newEmployeeData, company: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="manager">Manager</Label>
-                    <Input
-                      id="manager"
-                      placeholder="Manager name"
-                      value={newEmployeeData.manager || ""}
-                      onChange={(e) => setNewEmployeeData({ ...newEmployeeData, manager: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="location">Location</Label>
-                    <Input
-                      id="location"
-                      placeholder="Office location"
-                      value={newEmployeeData.location || ""}
-                      onChange={(e) => setNewEmployeeData({ ...newEmployeeData, location: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="empCode">Employee Code</Label>
-                    <Input
-                      id="empCode"
-                      placeholder="EMP001"
-                      value={newEmployeeData.empCode || ""}
-                      onChange={(e) => setNewEmployeeData({ ...newEmployeeData, empCode: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <h3 className="font-semibold text-lg">Bank Details</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="accountNumber">Account Number</Label>
-                    <Input
-                      id="accountNumber"
-                      placeholder="Bank account number"
-                      value={newEmployeeData.accountNumber || ""}
-                      onChange={(e) => setNewEmployeeData({ ...newEmployeeData, accountNumber: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="bankName">Bank Name</Label>
-                    <Input
-                      id="bankName"
-                      placeholder="Name of the bank"
-                      value={newEmployeeData.bankName || ""}
-                      onChange={(e) => setNewEmployeeData({ ...newEmployeeData, bankName: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="ifscCode">IFSC Code</Label>
-                    <Input
-                      id="ifscCode"
-                      placeholder="Bank IFSC code"
-                      value={newEmployeeData.ifscCode || ""}
-                      onChange={(e) => setNewEmployeeData({ ...newEmployeeData, ifscCode: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="panNo">PAN No</Label>
-                    <Input
-                      id="panNo"
-                      placeholder="PAN number"
-                      value={newEmployeeData.panNo || ""}
-                      onChange={(e) => setNewEmployeeData({ ...newEmployeeData, panNo: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="uanNo">UAN No</Label>
-                    <Input
-                      id="uanNo"
-                      placeholder="Universal Account Number"
-                      value={newEmployeeData.uanNo || ""}
-                      onChange={(e) => setNewEmployeeData({ ...newEmployeeData, uanNo: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </div>
             </div>
 
             {/* Action Buttons */}
@@ -695,6 +585,78 @@ export default function AdminDashboard() {
                 Add Employee
               </button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Success Dialog with Credentials */}
+      <Dialog open={!!createdCredentials} onOpenChange={(open) => {
+        if (!open) {
+          setCreatedCredentials(null)
+          setShowPassword(false)
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-green-600 flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
+                <div className="w-3 h-3 rounded-full bg-green-600" />
+              </div>
+              Employee Created Successfully
+            </DialogTitle>
+            <DialogDescription>
+              Please share these credentials with the employee. They will need them to log in for the first time.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="bg-muted p-4 rounded-lg space-y-3 mt-2">
+            <div>
+              <p className="text-xs text-muted-foreground uppercase font-semibold">Login ID</p>
+              <div className="flex items-center justify-between bg-background p-2 rounded border mt-1">
+                <code className="text-sm font-mono">{createdCredentials?.employee_id}</code>
+                <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => navigator.clipboard.writeText(createdCredentials?.employee_id || "")}>
+                  <Copy className="w-3 h-3" />
+                </Button>
+              </div>
+            </div>
+            
+            <div>
+              <p className="text-xs text-muted-foreground uppercase font-semibold">Password</p>
+              <div className="flex items-center justify-between bg-background p-2 rounded border mt-1">
+                <code className="text-sm font-mono">
+                  {showPassword ? createdCredentials?.password : "••••••••••••"}
+                </code>
+                <div className="flex items-center gap-1">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-6 w-6 p-0" 
+                    onClick={() => setShowPassword(!showPassword)}
+                    title={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-6 w-6 p-0" 
+                    onClick={() => navigator.clipboard.writeText(createdCredentials?.password || "")}
+                    title="Copy password"
+                  >
+                    <Copy className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs text-muted-foreground uppercase font-semibold">Work Email</p>
+              <p className="text-sm mt-1">{createdCredentials?.work_email}</p>
+            </div>
+          </div>
+
+          <div className="flex justify-end mt-4">
+            <Button onClick={() => setCreatedCredentials(null)}>Done</Button>
           </div>
         </DialogContent>
       </Dialog>

@@ -38,6 +38,9 @@ class Attendance(AttendanceBase):
     employee_profile_id: int
     check_in_time: Optional[datetime] = None
     check_out_time: Optional[datetime] = None
+    employee_profile: Optional["EmployeeProfile"] = None
 
     class Config:
         from_attributes = True
+
+from app.schemas.employee import EmployeeProfile

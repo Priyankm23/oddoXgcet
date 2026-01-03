@@ -18,7 +18,15 @@ COMPANY_LOGO_DIR = Path("static/company_logos")
 COMPANY_LOGO_DIR.mkdir(parents=True, exist_ok=True)
 
 def authenticate_user(db: Session, email: str, password: str) -> User:
+    # Check by email
     user = db.query(User).filter(User.email == email).first()
+    
+    # If not found by email, check by employee_id (login id)
+    if not user:
+        employee_profile = db.query(EmployeeProfile).filter(EmployeeProfile.employee_id == email).first()
+        if employee_profile:
+            user = employee_profile.user
+
     if not user or not verify_password(password, user.hashed_password):
         return None
     return user

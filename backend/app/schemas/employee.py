@@ -49,11 +49,28 @@ class EmployeeProfile(EmployeeProfileBase):
     user_id: int
     company_id: int
     employee_id: str
-    manager_id: Optional[int] = None
 
     class Config:
         from_attributes = True
 
+class EmployeeCreateBasic(BaseModel):
+    first_name: str
+    last_name: str
+    work_email: EmailStr
+    job_position: str
+    department: str
+    mobile: str
+    joining_date: date
+
+class EmployeeBasicResponse(BaseModel):
+    employee_id: str
+    password: str
+    work_email: str
+    message: str
+
 class EmployeeListResponse(EmployeeProfile):
     email: str
     status: str = "pending"
+
+class EmployeeProfileMeResponse(EmployeeProfile):
+    email: str

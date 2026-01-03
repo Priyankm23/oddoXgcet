@@ -1,44 +1,68 @@
 "use client"
 
-import { Suspense, useState } from "react"
-import { ChevronLeft, ChevronRight, Search, Calendar as CalendarIcon } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Suspense, useState, useEffect, useCallback } from "react"
+import { ChevronLeft, ChevronRight, Search, Calendar as CalendarIcon, Loader2 } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { api } from "@/lib/api"
+import { AttendanceRecord } from "@/hooks/use-attendance-status"
+
+interface AdminAttendanceRecord extends AttendanceRecord {
+  employee_profile?: {
+    first_name: string
+    last_name: string
+    user_id: number
+  }
+}
 
 function AttendanceContent() {
-  const [selectedDate, setSelectedDate] = useState(new Date(2025, 9, 22)) // Oct 22, 2025
+  const [selectedDate, setSelectedDate] = useState(new Date())
   const [searchQuery, setSearchQuery] = useState("")
   const [viewMode, setViewMode] = useState<"day" | "month">("day")
+  const [records, setRecords] = useState<AdminAttendanceRecord[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // Mock employee attendance data
-  const attendanceData = [
-    {
-      id: 1,
-      name: "Employee 1",
-      checkIn: "10:00",
-      checkOut: "19:00",
-      workHours: "09:00",
-      extraHours: "01:00",
-    },
-    {
-      id: 2,
-      name: "Employee 2",
-      checkIn: "10:00",
-      checkOut: "19:00",
-      workHours: "09:00",
-      extraHours: "01:00",
-    },
-    {
-      id: 3,
-      name: "Employee 3",
-      checkIn: "10:30",
-      checkOut: "18:30",
-      workHours: "08:00",
-      extraHours: "00:00",
-    },
-  ]
+  const fetchRecords = useCallback(async () => {
+    try {
+      setLoading(true)
+      // For Admin, we want to see all employees attendance for the selected date/range.
+      // The current backend API has /daily, /weekly, /all.
+      // /daily takes a 'day' query param.
+      // /all gives everything.
 
-  const filteredData = attendanceData.filter((emp) => emp.name.toLowerCase().includes(searchQuery.toLowerCase()))
+      let endpoint = ""
+      if (viewMode === 'day') {
+        const formattedDate = selectedDate.toISOString().split('T')[0]
+        endpoint = `/attendance/daily?day=${formattedDate}`
+      } else {
+        // For month view, we might need a range endpoint or just fetch all and filter.
+        // Let's use /all for now as a fallback or assume /daily is sufficient for day view which is default.
+        // Ideally backend should support range query.
+        // Attempting to use /all?limit=1000 for now to support search/month view approx.
+        // In a real scenario, we'd add start_date/end_date params to backend.
+        endpoint = `/attendance/all?limit=1000`
+      }
+
+      const token = localStorage.getItem("token") || undefined
+      const data = await api.get(endpoint, token)
+      setRecords(data)
+    } catch (error) {
+      console.error("Failed to fetch admin attendance records", error)
+      setRecords([])
+    } finally {
+      setLoading(false)
+    }
+  }, [selectedDate, viewMode])
+
+  useEffect(() => {
+    fetchRecords()
+  }, [fetchRecords])
+
+  const filteredData = records.filter((record) => {
+    if (!searchQuery) return true
+    const fullName = record.employee_profile ? `${record.employee_profile.first_name} ${record.employee_profile.last_name}` : `EMP-${record.employee_profile_id}`
+    return fullName.toLowerCase().includes(searchQuery.toLowerCase())
+  })
 
   const previousDay = () => {
     setSelectedDate(new Date(selectedDate.getTime() - 24 * 60 * 60 * 1000))
@@ -50,6 +74,21 @@ function AttendanceContent() {
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" })
+  }
+
+  const formatTime = (timeString: string | null) => {
+    if (!timeString) return "--:--"
+    return new Date(timeString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  }
+
+  const calculateHours = (start: string | null, end: string | null) => {
+    if (!start || !end) return "--:--"
+    const startTime = new Date(start)
+    const endTime = new Date(end)
+    const diff = endTime.getTime() - startTime.getTime()
+    const hours = Math.floor(diff / (1000 * 60 * 60))
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
   }
 
   return (
@@ -82,8 +121,8 @@ function AttendanceContent() {
 
           {/* Date Navigation */}
           <div className="flex flex-wrap items-center gap-3">
-            <button 
-              onClick={previousDay} 
+            <button
+              onClick={previousDay}
               className="p-2 hover:bg-muted rounded-lg transition border border-border"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -96,6 +135,7 @@ function AttendanceContent() {
               className="px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value="day">Day</option>
+              {/* Month view is complex without backend range support, keeping UI but logic defaults to list */}
               <option value="month">Month</option>
             </select>
 
@@ -107,8 +147,8 @@ function AttendanceContent() {
               className="px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
             />
 
-            <button 
-              onClick={nextDay} 
+            <button
+              onClick={nextDay}
               className="p-2 hover:bg-muted rounded-lg transition border border-border"
             >
               <ChevronRight className="w-4 h-4" />
@@ -133,28 +173,48 @@ function AttendanceContent() {
                   <th className="px-4 py-4 text-left font-semibold text-foreground">Check In</th>
                   <th className="px-4 py-4 text-left font-semibold text-foreground">Check Out</th>
                   <th className="px-4 py-4 text-left font-semibold text-foreground">Work Hours</th>
-                  <th className="px-4 py-4 text-left font-semibold text-foreground">Extra Hours</th>
+                  <th className="px-4 py-4 text-left font-semibold text-foreground">Status</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredData.length > 0 ? (
-                  filteredData.map((emp) => (
-                    <tr key={emp.id} className="border-b border-border hover:bg-muted/30 transition">
-                      <td className="px-4 py-4 font-medium text-foreground">{emp.name}</td>
-                      <td className="px-4 py-4">
-                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                          {emp.checkIn}
-                        </Badge>
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">
+                      <div className="flex justify-center items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Loading records...
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredData.length > 0 ? (
+                  filteredData.map((record) => (
+                    <tr key={record.id} className="border-b border-border hover:bg-muted/30 transition">
+                      <td className="px-4 py-4 font-medium text-foreground">
+                        {record.employee_profile ?
+                          `${record.employee_profile.first_name} ${record.employee_profile.last_name}`
+                          : `EMP-${record.employee_profile_id}`
+                        }
                       </td>
                       <td className="px-4 py-4">
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                          {emp.checkOut}
-                        </Badge>
+                        {record.check_in_time ? (
+                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                            {formatTime(record.check_in_time)}
+                          </Badge>
+                        ) : "--:--"}
                       </td>
-                      <td className="px-4 py-4 font-medium">{emp.workHours}</td>
+                      <td className="px-4 py-4">
+                        {record.check_out_time ? (
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                            {formatTime(record.check_out_time)}
+                          </Badge>
+                        ) : "--:--"}
+                      </td>
+                      <td className="px-4 py-4 font-medium">
+                        {calculateHours(record.check_in_time, record.check_out_time)}
+                      </td>
                       <td className="px-4 py-4">
                         <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-                          {emp.extraHours}
+                          {record.status}
                         </Badge>
                       </td>
                     </tr>

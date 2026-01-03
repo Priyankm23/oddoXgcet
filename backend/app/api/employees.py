@@ -1,12 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Response
 from sqlalchemy.orm import Session
+from sqlalchemy import extract
 from typing import List
 import shutil
+import secrets
+import string
 from pathlib import Path
 from datetime import date
 from app.database import get_db
-from app.models import User, EmployeeProfile, UserRole, BankDetail, Skill, EmployeeSkill, Certification, Attendance, LeaveRequest, LeaveStatus
-from app.schemas import EmployeeProfile as EmployeeProfileSchema, EmployeeProfileUpdate, BankDetail as BankDetailSchema, BankDetailCreate, BankDetailUpdate, Skill as SkillSchema, EmployeeSkillCreate, Certification as CertificationSchema, CertificationCreate, CertificationUpdate, EmployeeListResponse
+from app.models import User, EmployeeProfile, UserRole, BankDetail, Skill, EmployeeSkill, Certification, Attendance, LeaveRequest, LeaveStatus, UserSettings
+from app.schemas import EmployeeProfile as EmployeeProfileSchema, EmployeeProfileUpdate, BankDetail as BankDetailSchema, BankDetailCreate, BankDetailUpdate, Skill as SkillSchema, EmployeeSkillCreate, Certification as CertificationSchema, CertificationCreate, CertificationUpdate, EmployeeListResponse, EmployeeCreateBasic, EmployeeBasicResponse
+from app.auth.security import get_password_hash
 
 from app.auth.dependencies import get_current_active_user, get_current_active_user_with_roles
 
@@ -14,6 +18,111 @@ router = APIRouter()
 
 UPLOAD_DIR = Path("static/profile_pictures")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+@router.post("/", response_model=EmployeeBasicResponse, status_code=status.HTTP_201_CREATED)
+def create_employee(
+    employee_in: EmployeeCreateBasic,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user_with_roles([UserRole.ADMIN, UserRole.HR_OFFICER])),
+):
+    """
+    Create a new employee with basic information.
+    Auto-generates Login ID and Password.
+    """
+    # 1. Check if email already exists
+    if db.query(User).filter(User.email == employee_in.work_email).first():
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    # 2. Generate Login ID
+    # Format: OI + First 2 First + First 2 Last + Year + Serial
+    # Example: OIJODO20220001
+    
+    first_part = employee_in.first_name[:2].upper()
+    last_part = employee_in.last_name[:2].upper() if employee_in.last_name else "XX"
+    year = employee_in.joining_date.year
+    
+    # Find max serial for this year
+    # We look for employees joined in this year
+    employees_this_year = db.query(EmployeeProfile).filter(extract('year', EmployeeProfile.joining_date) == year).all()
+    
+    max_serial = 0
+    for emp in employees_this_year:
+        # Try to extract serial from the end of employee_id
+        # Assuming format ends with YYYYNNNN
+        try:
+            # ID might be OIJODO20220001
+            # Last 4 digits are serial
+            serial_str = emp.employee_id[-4:]
+            if serial_str.isdigit():
+                max_serial = max(max_serial, int(serial_str))
+        except:
+            pass
+            
+    new_serial = max_serial + 1
+    serial_str = f"{new_serial:04d}"
+    
+    login_id = f"OI{first_part}{last_part}{year}{serial_str}"
+    
+    # Ensure uniqueness of login_id (just in case)
+    while db.query(EmployeeProfile).filter(EmployeeProfile.employee_id == login_id).first():
+        new_serial += 1
+        serial_str = f"{new_serial:04d}"
+        login_id = f"OI{first_part}{last_part}{year}{serial_str}"
+
+    # 3. Generate Password
+    alphabet = string.ascii_letters + string.digits + string.punctuation
+    password = ''.join(secrets.choice(alphabet) for i in range(12))
+    hashed_password = get_password_hash(password)
+
+    # 4. Create User
+    # We use work_email as the User.email
+    db_user = User(
+        email=employee_in.work_email,
+        hashed_password=hashed_password,
+        role=UserRole.EMPLOYEE,
+        is_active=True
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    
+    # 5. Create UserSettings
+    user_settings = UserSettings(user_id=db_user.id)
+    db.add(user_settings)
+    
+    # 6. Get Company ID (from current user's profile)
+    # HR/Admin must have a profile and company
+    hr_profile = db.query(EmployeeProfile).filter(EmployeeProfile.user_id == current_user.id).first()
+    if hr_profile:
+        company_id = hr_profile.company_id
+    else:
+        # Fallback if admin has no profile (should not happen in normal flow)
+        # Try to find any company or create one? 
+        # For now, assume ID 1 exists or fail.
+        company_id = 1 
+
+    # 7. Create EmployeeProfile
+    new_profile = EmployeeProfile(
+        user_id=db_user.id,
+        company_id=company_id,
+        employee_id=login_id,
+        first_name=employee_in.first_name,
+        last_name=employee_in.last_name,
+        phone=employee_in.mobile,
+        designation=employee_in.job_position,
+        department=employee_in.department,
+        joining_date=employee_in.joining_date,
+        # personal_email is optional, we don't set it from work_email
+    )
+    db.add(new_profile)
+    db.commit()
+    
+    return EmployeeBasicResponse(
+        employee_id=login_id,
+        password=password,
+        work_email=employee_in.work_email,
+        message="Employee created successfully. Please save these credentials."
+    )
 
 @router.get("/", response_model=List[EmployeeListResponse])
 def read_all_employees(
@@ -60,31 +169,9 @@ def read_all_employees(
                 status_val = "absent" 
         
         # Create response object
-        # We need to convert SQLAlchemy object to dict and add extra fields
-        # Pydantic's from_attributes=True handles the mapping from ORM object, 
-        # but we need to manually inject the extra fields not in the ORM model
-        
-        # A cleaner way with Pydantic v2 (if used) or just constructing it:
+        emp_profile = EmployeeProfileSchema.model_validate(emp)
         emp_data = EmployeeListResponse(
-            **{k: v for k, v in emp.__dict__.items() if k in EmployeeProfileSchema.model_fields},
-            id=emp.id,
-            user_id=emp.user_id,
-            company_id=emp.company_id,
-            employee_id=emp.employee_id,
-            manager_id=emp.manager_id,
-            first_name=emp.first_name,
-            last_name=emp.last_name,
-            phone=emp.phone,
-            date_of_birth=emp.date_of_birth,
-            gender=emp.gender,
-            marital_status=emp.marital_status,
-            nationality=emp.nationality,
-            address=emp.address,
-            personal_email=emp.personal_email,
-            department=emp.department,
-            designation=emp.designation,
-            joining_date=emp.joining_date,
-            profile_picture=emp.profile_picture,
+            **emp_profile.model_dump(),
             email=email,
             status=status_val
         )
@@ -92,7 +179,7 @@ def read_all_employees(
         
     return result
 
-@router.get("/me", response_model=EmployeeProfileSchema)
+@router.get("/me", response_model=EmployeeProfileMeResponse)
 def read_my_profile(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
@@ -103,7 +190,12 @@ def read_my_profile(
     employee_profile = db.query(EmployeeProfile).filter(EmployeeProfile.user_id == current_user.id).first()
     if not employee_profile:
         raise HTTPException(status_code=404, detail="Employee profile not found for this user")
-    return employee_profile
+    
+    # Create response with email from user
+    return EmployeeProfileMeResponse(
+        **EmployeeProfileSchema.model_validate(employee_profile).model_dump(),
+        email=current_user.email
+    )
 
 @router.get("/{employee_profile_id}", response_model=EmployeeProfileSchema)
 def read_employee_profile_by_id(

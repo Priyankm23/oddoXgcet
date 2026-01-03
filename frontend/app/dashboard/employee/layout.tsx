@@ -1,10 +1,12 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LogOut, User, Menu, X } from "lucide-react"
+import { LogOut, User, Menu, X, Loader2 } from "lucide-react"
+import { useAttendanceStatus } from "@/hooks/use-attendance-status"
+import { api } from "@/lib/api"
 
 export default function EmployeeDashboardLayout({
   children,
@@ -13,14 +15,79 @@ export default function EmployeeDashboardLayout({
 }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
-  const [isCheckedIn, setIsCheckedIn] = useState(false)
+
+  // Integrated hook for real attendance status
+  const { status, loading, checkIn, checkOut, error: attendanceError } = useAttendanceStatus()
+  const [isProcessing, setIsProcessing] = useState(false)
+
+  const isCheckedIn = status === 'checked-in'
+
   const [companyLogo] = useState("/generic-company-logo.png")
   const [userAvatar] = useState("/diverse-user-avatars.png")
-  const [userName] = useState("Jane Doe")
+  const [userName, setUserName] = useState("Employee")
   const pathname = usePathname()
 
-  const handleLogout = () => {
-    console.log("Logging out...")
+  // Display error if attendance action fails
+  useEffect(() => {
+    if (attendanceError) {
+      alert(attendanceError) // Simple alert for now to ensure visibility
+    }
+  }, [attendanceError])
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const token = localStorage.getItem("token")
+        if (token) {
+          const userData = await api.get("/users/me", token)
+          // Assuming userData has employee_profile, otherwise falls back to email or generic
+          // The /users/me endpoint returns UserSchema which might need to include profile or we fetch profile separately.
+          // Let's assume for now we use email or if available profile name.
+          // Actually UserSchema in backend has: id, email, is_active, role.
+          // To get name we might need relationship loading or fetch profile.
+          // Let's check if UserSchema includes 'employee_profile'.
+          // If not, we might display email for now or fetch /employees/me if exists.
+          // Checking backend/app/schemas/user.py would be ideal but let's just use email as fallback.
+          if (userData.email) {
+            setUserName(userData.email.split('@')[0])
+          }
+        }
+      } catch (e) {
+        console.error(e)
+      }
+    }
+    fetchUser()
+  }, [])
+
+  const handleLogout = async () => {
+    try {
+      const token = localStorage.getItem("token")
+      if (token) {
+        await api.post("/auth/logout", {}, token)
+      }
+    } catch (error) {
+      console.error("Logout failed:", error)
+    } finally {
+      localStorage.removeItem("token")
+      localStorage.removeItem("role")
+      window.location.href = "/auth/employee/login"
+    }
+  }
+
+  const handleAttendanceToggle = async () => {
+    if (loading || isProcessing) return
+    setIsProcessing(true)
+    try {
+      if (isCheckedIn) {
+        await checkOut()
+      } else {
+        await checkIn()
+      }
+    } catch (e) {
+      // Error handled by hook state
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
   const isActiveTab = (href: string) => {
@@ -48,31 +115,28 @@ export default function EmployeeDashboardLayout({
             <div className="hidden md:flex items-center gap-2 bg-muted/30 p-1 rounded-xl">
               <Link
                 href="/dashboard/employee"
-                className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  isActiveTab("/dashboard/employee")
-                    ? "text-foreground bg-background shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
+                className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${isActiveTab("/dashboard/employee")
+                  ? "text-foreground bg-background shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+                  }`}
               >
                 Dashboard
               </Link>
               <Link
                 href="/dashboard/employee/attendance"
-                className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  isActiveTab("/dashboard/employee/attendance")
-                    ? "text-foreground bg-background shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
+                className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${isActiveTab("/dashboard/employee/attendance")
+                  ? "text-foreground bg-background shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+                  }`}
               >
                 Attendance
               </Link>
               <Link
                 href="/dashboard/employee/time-off"
-                className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  isActiveTab("/dashboard/employee/time-off")
-                    ? "text-foreground bg-background shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
+                className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${isActiveTab("/dashboard/employee/time-off")
+                  ? "text-foreground bg-background shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+                  }`}
               >
                 Time Off
               </Link>
@@ -81,16 +145,22 @@ export default function EmployeeDashboardLayout({
             {/* Right Side - Actions */}
             <div className="flex items-center gap-3">
               <button
-                onClick={() => setIsCheckedIn(!isCheckedIn)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition ${
-                  isCheckedIn
-                    ? "bg-green-500/10 border-green-500/30 hover:bg-green-500/20"
+                onClick={handleAttendanceToggle}
+                disabled={loading || isProcessing || status === 'checked-out'}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition ${isCheckedIn
+                  ? "bg-green-500/10 border-green-500/30 hover:bg-green-500/20"
+                  : status === 'checked-out'
+                    ? "bg-muted border-muted-foreground/30 opacity-70 cursor-not-allowed"
                     : "bg-red-500/10 border-red-500/30 hover:bg-red-500/20"
-                }`}
+                  } ${loading || isProcessing ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
-                <div className={`w-3 h-3 rounded-full ${isCheckedIn ? "bg-green-500" : "bg-red-500"}`}></div>
-                <span className={`text-sm font-medium ${isCheckedIn ? "text-green-600" : "text-red-600"}`}>
-                  {isCheckedIn ? "Check Out" : "Check In"}
+                {loading || isProcessing ? (
+                  <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+                ) : (
+                  <div className={`w-3 h-3 rounded-full ${isCheckedIn ? "bg-green-500" : status === 'checked-out' ? "bg-gray-400" : "bg-red-500"}`}></div>
+                )}
+                <span className={`text-sm font-medium ${isCheckedIn ? "text-green-600" : status === 'checked-out' ? "text-muted-foreground" : "text-red-600"}`}>
+                  {isCheckedIn ? "Check Out" : status === 'checked-out' ? "Completed" : "Check In"}
                 </span>
               </button>
 
@@ -144,31 +214,28 @@ export default function EmployeeDashboardLayout({
             <div className="mt-4 md:hidden flex flex-col gap-2">
               <Link
                 href="/dashboard/employee"
-                className={`px-4 py-2 rounded-md text-sm font-medium transition ${
-                  isActiveTab("/dashboard/employee")
-                    ? "text-foreground bg-muted"
-                    : "text-muted-foreground hover:bg-muted"
-                }`}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition ${isActiveTab("/dashboard/employee")
+                  ? "text-foreground bg-muted"
+                  : "text-muted-foreground hover:bg-muted"
+                  }`}
               >
                 Dashboard
               </Link>
               <Link
                 href="/dashboard/employee/attendance"
-                className={`px-4 py-2 rounded-md text-sm font-medium transition ${
-                  isActiveTab("/dashboard/employee/attendance")
-                    ? "text-foreground bg-muted"
-                    : "text-muted-foreground hover:bg-muted"
-                }`}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition ${isActiveTab("/dashboard/employee/attendance")
+                  ? "text-foreground bg-muted"
+                  : "text-muted-foreground hover:bg-muted"
+                  }`}
               >
                 Attendance
               </Link>
               <Link
                 href="/dashboard/employee/time-off"
-                className={`px-4 py-2 rounded-md text-sm font-medium transition ${
-                  isActiveTab("/dashboard/employee/time-off")
-                    ? "text-foreground bg-muted"
-                    : "text-muted-foreground hover:bg-muted"
-                }`}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition ${isActiveTab("/dashboard/employee/time-off")
+                  ? "text-foreground bg-muted"
+                  : "text-muted-foreground hover:bg-muted"
+                  }`}
               >
                 Time Off
               </Link>

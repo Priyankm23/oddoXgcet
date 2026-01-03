@@ -2,10 +2,12 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LogOut, User, Menu, X } from "lucide-react"
+import { api } from "@/lib/api"
+import { LogOut, User, Menu, X, Loader2 } from "lucide-react"
+import { useAttendanceStatus } from "@/hooks/use-attendance-status"
 
 export default function AdminDashboardLayout({
   children,
@@ -14,15 +16,54 @@ export default function AdminDashboardLayout({
 }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
-  const [isCheckedIn, setIsCheckedIn] = useState(false)
+
+  // Integrated hook for real attendance status
+  const { status, loading, checkIn, checkOut, error: attendanceError } = useAttendanceStatus()
+  const [isProcessing, setIsProcessing] = useState(false)
+
+  // Display error if attendance action fails
+  useEffect(() => {
+    if (attendanceError) {
+      alert(attendanceError)
+    }
+  }, [attendanceError])
+
+  const isCheckedIn = status === 'checked-in'
+
   const [companyLogo] = useState("/generic-company-logo.png")
   const [userAvatar] = useState("/diverse-user-avatars.png")
   const [userName] = useState("John Doe")
   const pathname = usePathname()
 
-  const handleLogout = () => {
-    // TODO: Implement actual logout logic
-    console.log("Logging out...")
+  const handleLogout = async () => {
+    try {
+      const token = localStorage.getItem("token")
+      if (token) {
+        await api.post("/auth/logout", {}, token)
+      }
+    } catch (error) {
+      console.error("Logout failed:", error)
+    } finally {
+      localStorage.removeItem("token")
+      localStorage.removeItem("role")
+      window.location.href = "/auth/admin/login"
+    }
+  }
+
+  const handleAttendanceToggle = async () => {
+    if (loading || isProcessing) return
+    setIsProcessing(true)
+    try {
+      if (isCheckedIn) {
+        await checkOut()
+      } else {
+        await checkIn()
+      }
+    } catch (e) {
+      // Error handled by hook state
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
   const isActiveTab = (href: string) => {
@@ -51,31 +92,28 @@ export default function AdminDashboardLayout({
             <div className="hidden md:flex items-center gap-2 bg-muted/50 p-1.5 rounded-xl">
               <Link
                 href="/dashboard/admin"
-                className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  isActiveTab("/dashboard/admin") 
-                    ? "text-foreground bg-background shadow-sm" 
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
+                className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${isActiveTab("/dashboard/admin")
+                  ? "text-foreground bg-background shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+                  }`}
               >
                 Employees
               </Link>
               <Link
                 href="/dashboard/admin/attendance"
-                className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  isActiveTab("/dashboard/admin/attendance")
-                    ? "text-foreground bg-background shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
+                className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${isActiveTab("/dashboard/admin/attendance")
+                  ? "text-foreground bg-background shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+                  }`}
               >
                 Attendance
               </Link>
               <Link
                 href="/dashboard/admin/time-off"
-                className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  isActiveTab("/dashboard/admin/time-off")
-                    ? "text-foreground bg-background shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
+                className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${isActiveTab("/dashboard/admin/time-off")
+                  ? "text-foreground bg-background shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+                  }`}
               >
                 Time Off
               </Link>
@@ -85,16 +123,22 @@ export default function AdminDashboardLayout({
             <div className="flex items-center gap-3">
               <button
                 suppressHydrationWarning
-                onClick={() => setIsCheckedIn(!isCheckedIn)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition ${
-                  isCheckedIn
-                    ? "bg-green-500/10 border-green-500/30 hover:bg-green-500/20"
+                onClick={handleAttendanceToggle}
+                disabled={loading || isProcessing || status === 'checked-out'}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition ${isCheckedIn
+                  ? "bg-green-500/10 border-green-500/30 hover:bg-green-500/20"
+                  : status === 'checked-out'
+                    ? "bg-muted border-muted-foreground/30 opacity-70 cursor-not-allowed"
                     : "bg-red-500/10 border-red-500/30 hover:bg-red-500/20"
-                }`}
+                  } ${loading || isProcessing ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
-                <div className={`w-3 h-3 rounded-full ${isCheckedIn ? "bg-green-500" : "bg-red-500"}`}></div>
-                <span className={`text-sm font-medium ${isCheckedIn ? "text-green-600" : "text-red-600"}`}>
-                  {isCheckedIn ? "Check Out" : "Check In"}
+                {loading || isProcessing ? (
+                  <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+                ) : (
+                  <div className={`w-3 h-3 rounded-full ${isCheckedIn ? "bg-green-500" : status === 'checked-out' ? "bg-gray-400" : "bg-red-500"}`}></div>
+                )}
+                <span className={`text-sm font-medium ${isCheckedIn ? "text-green-600" : status === 'checked-out' ? "text-muted-foreground" : "text-red-600"}`}>
+                  {isCheckedIn ? "Check Out" : status === 'checked-out' ? "Completed" : "Check In"}
                 </span>
               </button>
 
@@ -149,29 +193,26 @@ export default function AdminDashboardLayout({
             <div className="mt-4 md:hidden flex flex-col gap-2">
               <Link
                 href="/dashboard/admin"
-                className={`px-4 py-2 rounded-md text-sm font-medium transition ${
-                  isActiveTab("/dashboard/admin") ? "text-foreground bg-muted" : "text-muted-foreground"
-                }`}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition ${isActiveTab("/dashboard/admin") ? "text-foreground bg-muted" : "text-muted-foreground"
+                  }`}
               >
                 Employees
               </Link>
               <Link
                 href="/dashboard/admin/attendance"
-                className={`px-4 py-2 rounded-md text-sm font-medium transition ${
-                  isActiveTab("/dashboard/admin/attendance")
-                    ? "text-foreground bg-muted"
-                    : "text-muted-foreground"
-                }`}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition ${isActiveTab("/dashboard/admin/attendance")
+                  ? "text-foreground bg-muted"
+                  : "text-muted-foreground"
+                  }`}
               >
                 Attendance
               </Link>
               <Link
                 href="/dashboard/admin/time-off"
-                className={`px-4 py-2 rounded-md text-sm font-medium transition ${
-                  isActiveTab("/dashboard/admin/time-off")
-                    ? "text-foreground bg-muted"
-                    : "text-muted-foreground"
-                }`}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition ${isActiveTab("/dashboard/admin/time-off")
+                  ? "text-foreground bg-muted"
+                  : "text-muted-foreground"
+                  }`}
               >
                 Time Off
               </Link>

@@ -1,39 +1,81 @@
 "use client"
-
-import { useState } from "react"
-import { Edit, User, Mail, Phone, Building2, MapPin, Briefcase, Calendar as CalendarIcon } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Edit, User, Mail, Phone, Building2, MapPin, Briefcase, Calendar as CalendarIcon, Copy, Eye, EyeOff, Shield } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
+
+interface EmployeeProfileData {
+  first_name: string
+  last_name: string
+  department: string
+  designation: string
+  email: string
+  phone: string
+  joining_date: string
+  profile_picture?: string
+  nationality?: string
+  address?: string
+  personal_email?: string
+  gender?: string
+  marital_status?: string
+  date_of_birth?: string
+  employee_id: string
+  bank_details?: any[]
+}
 
 export default function EmployeeProfile() {
-  // Mock employee data (would come from authentication context in real app)
-  const [profileData] = useState({
-    name: "Jane Doe",
-    jobPosition: "Software Engineer",
-    email: "jane.doe@company.com",
-    mobile: "+1 (555) 987-6543",
-    company: "TechCorp Inc.",
-    department: "Engineering",
-    manager: "Sarah Johnson",
-    location: "San Francisco",
-    image: "/employee-avatar.png",
-    // Private Info
-    dateOfBirth: "April 22, 1995",
-    residingAddress: "456 Market Street, San Francisco, CA 94102",
-    nationality: "American",
-    personalEmail: "jane.personal@email.com",
-    gender: "Female",
-    maritalStatus: "Single",
-    dateOfJoining: "Jan 10, 2024",
-    // Bank Details (Salary Info)
-    accountNumber: "9876543210",
-    bankName: "Bank of America",
-    ifscCode: "BOFA0001234",
-    panNo: "ABCDE9876F",
-    uanNo: "987654321098",
-    empCode: "EMP002",
-  })
+  const [profileData, setProfileData] = useState<EmployeeProfileData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const token = localStorage.getItem("token")
+        const response = await fetch("http://127.0.0.1:8000/api/v1/employees/me", {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setProfileData(data)
+        } else {
+          console.error("Failed to fetch profile")
+          setError("Failed to load profile")
+        }
+      } catch (err) {
+        console.error("Error fetching profile:", err)
+        setError("Error loading data")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchProfile()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-full p-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  if (error || !profileData) {
+    return (
+      <div className="p-8 text-center text-destructive">
+        <p>{error || "No profile data found"}</p>
+      </div>
+    )
+  }
+
+  const fullName = `${profileData.first_name} ${profileData.last_name}`
 
   return (
     <div className="p-4 md:p-6 lg:p-8">
@@ -41,7 +83,7 @@ export default function EmployeeProfile() {
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-foreground mb-2">My Profile</h1>
         <p className="text-muted-foreground">
-          View your profile information, including personal details and bank information. Contact HR if you need to update any information.
+          View your profile information, including personal details and credentials. Contact HR if you need to update any information.
         </p>
       </div>
 
@@ -53,8 +95,8 @@ export default function EmployeeProfile() {
             <div className="flex flex-col items-center md:items-start">
               <div className="relative group">
                 <img
-                  src={profileData.image || "/placeholder.svg"}
-                  alt={profileData.name}
+                  src={profileData.profile_picture || "/placeholder.svg"}
+                  alt={fullName}
                   className="w-32 h-32 rounded-full object-cover border-4 border-primary/20"
                   onError={(e) => {
                     e.currentTarget.src = "/placeholder.svg"
@@ -70,11 +112,11 @@ export default function EmployeeProfile() {
             <div className="flex-1 space-y-4">
               <div className="space-y-2">
                 <Label className="text-sm text-muted-foreground">Name</Label>
-                <p className="text-2xl font-bold text-foreground">{profileData.name}</p>
+                <p className="text-2xl font-bold text-foreground">{fullName}</p>
               </div>
               <div className="space-y-2">
                 <Label className="text-sm text-muted-foreground">Job Position</Label>
-                <p className="font-medium text-foreground">{profileData.jobPosition}</p>
+                <p className="font-medium text-foreground">{profileData.designation || "N/A"}</p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -88,7 +130,7 @@ export default function EmployeeProfile() {
                   <Label className="text-sm text-muted-foreground">Mobile</Label>
                   <div className="flex items-center gap-2">
                     <Phone className="w-4 h-4 text-muted-foreground" />
-                    <p className="font-medium">{profileData.mobile}</p>
+                    <p className="font-medium">{profileData.phone || "N/A"}</p>
                   </div>
                 </div>
               </div>
@@ -101,28 +143,21 @@ export default function EmployeeProfile() {
                   <Label className="text-sm text-muted-foreground">Company</Label>
                   <div className="flex items-center gap-2">
                     <Building2 className="w-4 h-4 text-muted-foreground" />
-                    <p className="font-medium">{profileData.company}</p>
+                    <p className="font-medium">TechCorp Inc.</p> {/* Placeholder */}
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-sm text-muted-foreground">Department</Label>
                   <div className="flex items-center gap-2">
                     <Briefcase className="w-4 h-4 text-muted-foreground" />
-                    <p className="font-medium">{profileData.department}</p>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm text-muted-foreground">Manager</Label>
-                  <div className="flex items-center gap-2">
-                    <User className="w-4 h-4 text-muted-foreground" />
-                    <p className="font-medium">{profileData.manager}</p>
+                    <p className="font-medium">{profileData.department || "N/A"}</p>
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-sm text-muted-foreground">Location</Label>
                   <div className="flex items-center gap-2">
                     <MapPin className="w-4 h-4 text-muted-foreground" />
-                    <p className="font-medium">{profileData.location}</p>
+                    <p className="font-medium">{profileData.address ? "Address on file" : "N/A"}</p>
                   </div>
                 </div>
               </div>
@@ -132,20 +167,81 @@ export default function EmployeeProfile() {
       </Card>
 
       {/* Tabs Section */}
-      <Tabs defaultValue="resume" className="w-full">
+      <Tabs defaultValue="security" className="w-full">
         <TabsList className="w-full justify-start mb-6">
-          <TabsTrigger value="resume">Resume</TabsTrigger>
+          <TabsTrigger value="security">Details</TabsTrigger>
           <TabsTrigger value="private">Private Info</TabsTrigger>
+          <TabsTrigger value="resume">Resume</TabsTrigger>
           <TabsTrigger value="salary">Salary Info</TabsTrigger>
         </TabsList>
 
-        {/* Resume Tab */}
-        <TabsContent value="resume" className="space-y-6">
+        {/* Security Tab */}
+        <TabsContent value="security" className="space-y-6">
           <Card>
             <CardContent className="p-6">
-              <p className="text-sm text-muted-foreground">
-                Your resume and professional information can be updated through HR. Contact your HR representative to make changes to your resume, skills, and professional background.
-              </p>
+              <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                <Shield className="w-5 h-5 text-primary" />
+                Account Credentials
+              </h3>
+              <div className="grid grid-cols-1 gap-6 max-w-2xl">
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">Login ID</Label>
+                  <div className="flex items-center gap-3">
+                    <code className="bg-muted px-3 py-2 rounded-md font-mono text-base flex-1">
+                      {profileData.employee_id}
+                    </code>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => navigator.clipboard.writeText(profileData.employee_id)}
+                      title="Copy Login ID"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">Work Email</Label>
+                  <div className="flex items-center gap-3">
+                    <code className="bg-muted px-3 py-2 rounded-md font-mono text-base flex-1">
+                      {profileData.email}
+                    </code>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => navigator.clipboard.writeText(profileData.email)}
+                      title="Copy Email"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">Password</Label>
+                  <div className="flex items-center gap-3">
+                    <code className="bg-muted px-3 py-2 rounded-md font-mono text-base flex-1">
+                      {showPassword ? "********" : "••••••••"}
+                    </code>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setShowPassword(!showPassword)}
+                        title={showPassword ? "Hide" : "Show"}
+                        disabled
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </Button>
+                      <span className="text-xs text-muted-foreground italic">Hidden for security</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Passwords cannot be viewed after creation. Please contact IT/HR if you need to reset it.
+                  </p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -158,82 +254,60 @@ export default function EmployeeProfile() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label className="text-sm text-muted-foreground">Date of Birth</Label>
-                  <p className="font-medium text-foreground">{profileData.dateOfBirth}</p>
+                  <p className="font-medium text-foreground">{profileData.date_of_birth || "N/A"}</p>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-sm text-muted-foreground">Date of Joining</Label>
                   <div className="flex items-center gap-2">
                     <CalendarIcon className="w-4 h-4 text-muted-foreground" />
-                    <p className="font-medium text-foreground">{profileData.dateOfJoining}</p>
+                    <p className="font-medium text-foreground">{profileData.joining_date || "N/A"}</p>
                   </div>
                 </div>
                 <div className="space-y-2 col-span-1 md:col-span-2">
                   <Label className="text-sm text-muted-foreground">Residing Address</Label>
-                  <p className="font-medium text-foreground">{profileData.residingAddress}</p>
+                  <p className="font-medium text-foreground">{profileData.address || "N/A"}</p>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-sm text-muted-foreground">Nationality</Label>
-                  <p className="font-medium text-foreground">{profileData.nationality}</p>
+                  <p className="font-medium text-foreground">{profileData.nationality || "N/A"}</p>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-sm text-muted-foreground">Personal Email</Label>
                   <div className="flex items-center gap-2">
                     <Mail className="w-4 h-4 text-muted-foreground" />
-                    <p className="font-medium text-foreground">{profileData.personalEmail}</p>
+                    <p className="font-medium text-foreground">{profileData.personal_email || "N/A"}</p>
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-sm text-muted-foreground">Gender</Label>
-                  <p className="font-medium text-foreground">{profileData.gender}</p>
+                  <p className="font-medium text-foreground">{profileData.gender || "N/A"}</p>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-sm text-muted-foreground">Marital Status</Label>
-                  <p className="font-medium text-foreground">{profileData.maritalStatus}</p>
+                  <p className="font-medium text-foreground">{profileData.marital_status || "N/A"}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
+        {/* Resume Tab */}
+        <TabsContent value="resume" className="space-y-6">
+          <Card>
+            <CardContent className="p-6">
+              <p className="text-sm text-muted-foreground">
+                Your resume and professional information can be updated through HR. Contact your HR representative to make changes to your resume, skills, and professional background.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+
         {/* Salary Info Tab */}
         <TabsContent value="salary" className="space-y-6">
           <Card>
-            <CardContent className="p-6">
-              <h3 className="text-lg font-semibold mb-6">Bank Details</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label className="text-sm text-muted-foreground">Account Number</Label>
-                  <p className="font-medium text-foreground">{profileData.accountNumber}</p>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm text-muted-foreground">Bank Name</Label>
-                  <p className="font-medium text-foreground">{profileData.bankName}</p>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm text-muted-foreground">IFSC Code</Label>
-                  <p className="font-medium text-foreground">{profileData.ifscCode}</p>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm text-muted-foreground">PAN No</Label>
-                  <p className="font-medium text-foreground">{profileData.panNo}</p>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm text-muted-foreground">UAN No</Label>
-                  <p className="font-medium text-foreground">{profileData.uanNo}</p>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm text-muted-foreground">Emp Code</Label>
-                  <p className="font-medium text-foreground">{profileData.empCode}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-blue-50/50 border-blue-200">
-            <CardContent className="p-6">
-              <p className="text-sm text-muted-foreground">
-                <span className="font-semibold text-foreground">Note:</span> For detailed salary breakdown including components, allowances, and deductions, please contact HR or check your monthly payslip. Bank details displayed here are used for salary credit.
-              </p>
+            <CardContent className="p-8 text-center text-muted-foreground">
+              <p>Salary information is not currently available.</p>
             </CardContent>
           </Card>
         </TabsContent>
