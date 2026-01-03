@@ -8,7 +8,7 @@ import string
 from pathlib import Path
 from datetime import date
 from app.database import get_db
-from app.models import User, EmployeeProfile, UserRole, BankDetail, Skill, EmployeeSkill, Certification, Attendance, LeaveRequest, LeaveStatus, UserSettings, LeaveBalance, LeaveType,
+from app.models import User, EmployeeProfile, UserRole, BankDetail, Skill, EmployeeSkill, Certification, Attendance, LeaveRequest, LeaveStatus, UserSettings, LeaveBalance, LeaveType
 from decimal import Decimal
 from app.schemas import EmployeeProfile as EmployeeProfileSchema, EmployeeProfileUpdate, BankDetail as BankDetailSchema, BankDetailCreate, BankDetailUpdate, Skill as SkillSchema, EmployeeSkillCreate, Certification as CertificationSchema, CertificationCreate, CertificationUpdate, EmployeeListResponse, EmployeeCreateBasic, EmployeeBasicResponse, EmployeeProfileMeResponse
 from app.auth.security import get_password_hash
