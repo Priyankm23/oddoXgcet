@@ -5,7 +5,7 @@ from .config import settings
 from .database import Base, engine, SessionLocal
 from .models import User, UserRole
 from .auth.security import get_password_hash
-from app.api import auth as auth_router, users as users_router, employees as employees_router, attendance as attendance_router, attendance_correction as attendance_correction_router, leave as leave_router, salary as salary_router, settings as settings_router, dashboard as dashboard_router
+from app.api import auth as auth_router, users as users_router, employees as employees_router, attendance as attendance_router, attendance_correction as attendance_correction_router, leave as leave_router, salary as salary_router, settings as settings_router, dashboard as dashboard_router, uploads as uploads_router
 
 app = FastAPI(
     title=settings.OPENAPI_TITLE,
@@ -69,3 +69,4 @@ app.include_router(leave_router.router, prefix="/api/v1/leave", tags=["leave"])
 app.include_router(salary_router.router, prefix="/api/v1/salary", tags=["salary"])
 app.include_router(settings_router.router, prefix="/api/v1/settings", tags=["settings"])
 app.include_router(dashboard_router.router, prefix="/api/v1/dashboard", tags=["dashboard"])
+app.include_router(uploads_router.router, prefix="/api/v1/uploads", tags=["uploads"])

@@ -1,7 +1,7 @@
 # This file makes the 'schemas' directory a package.
 from .user import User, UserCreate, UserUpdate
 from .company import Company, CompanyCreate, CompanyUpdate
-from .employee import EmployeeProfile, EmployeeProfileCreate, EmployeeProfileUpdate, EmployeeListResponse, EmployeeCreateBasic, EmployeeBasicResponse
+from .employee import EmployeeProfile, EmployeeProfileCreate, EmployeeProfileUpdate, EmployeeListResponse, EmployeeCreateBasic, EmployeeBasicResponse, EmployeeProfileMeResponse
 from .bank_detail import BankDetail, BankDetailCreate, BankDetailUpdate
 from .skill import Skill, SkillCreate, SkillUpdate, EmployeeSkill, EmployeeSkillCreate
 from .certification import Certification, CertificationCreate, CertificationUpdate

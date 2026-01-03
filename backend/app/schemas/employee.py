@@ -18,6 +18,7 @@ class EmployeeProfileBase(BaseModel):
     designation: Optional[str] = None
     joining_date: Optional[date] = None
     profile_picture: Optional[str] = None
+    resume_url: Optional[str] = None
 
 # Schema for creating a new employee profile
 class EmployeeProfileCreate(EmployeeProfileBase):
@@ -42,6 +43,7 @@ class EmployeeProfileUpdate(BaseModel):
     designation: Optional[str] = None
     joining_date: Optional[date] = None
     profile_picture: Optional[str] = None
+    resume_url: Optional[str] = None
 
 # Schema for employee profile data returned from the API
 class EmployeeProfile(EmployeeProfileBase):

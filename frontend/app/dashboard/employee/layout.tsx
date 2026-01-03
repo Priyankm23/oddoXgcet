@@ -39,7 +39,7 @@ export default function EmployeeDashboardLayout({
       try {
         const token = localStorage.getItem("token")
         if (token) {
-          const userData = await api.get("/users/me", token)
+          const userData = await api.get("/auth/users/me", token)
           // Assuming userData has employee_profile, otherwise falls back to email or generic
           // The /users/me endpoint returns UserSchema which might need to include profile or we fetch profile separately.
           // Let's assume for now we use email or if available profile name.

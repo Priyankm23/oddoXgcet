@@ -4,7 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import List, Optional
 from app.database import get_db
-from app.models import User, EmployeeProfile, LeaveRequest, LeaveBalance, UserRole, LeaveStatus
+from app.models import User, EmployeeProfile, LeaveRequest, LeaveBalance, UserRole, LeaveStatus, LeaveType
 from app.schemas import LeaveRequest as LeaveRequestSchema, LeaveRequestCreate, LeaveRequestUpdate, LeaveBalance as LeaveBalanceSchema
 from app.auth.dependencies import get_current_active_user, get_current_active_user_with_roles
 
@@ -35,18 +35,20 @@ def apply_for_leave(
     delta = leave_request_in.end_date - leave_request_in.start_date
     total_days = Decimal(delta.days + 1) # +1 to include both start and end dates
 
-    if total_days != leave_request_in.total_days:
-        raise HTTPException(status_code=400, detail="Total days calculated do not match provided total days.")
 
-    # Check leave balance (simplified for now, actual logic will be in leave_service)
-    leave_balance = db.query(LeaveBalance).filter(
-        LeaveBalance.employee_profile_id == employee_profile.id,
-        LeaveBalance.leave_type == leave_request_in.leave_type,
-        LeaveBalance.year == leave_request_in.start_date.year
-    ).first()
+    # Check leave balance (skip for UNPAID)
+    # Use string comparison for robustness
+    is_unpaid = str(leave_request_in.leave_type.value if hasattr(leave_request_in.leave_type, 'value') else leave_request_in.leave_type) == "unpaid"
+    
+    if not is_unpaid:
+        leave_balance = db.query(LeaveBalance).filter(
+            LeaveBalance.employee_profile_id == employee_profile.id,
+            LeaveBalance.leave_type == leave_request_in.leave_type,
+            LeaveBalance.year == leave_request_in.start_date.year
+        ).first()
 
-    if not leave_balance or leave_balance.remaining_days < total_days:
-        raise HTTPException(status_code=400, detail="Insufficient leave balance for this leave type.")
+        if not leave_balance or leave_balance.remaining_days < total_days:
+            raise HTTPException(status_code=400, detail="Insufficient leave balance for this leave type.")
 
     db_leave_request = LeaveRequest(
         employee_profile_id=employee_profile.id,
@@ -75,6 +77,17 @@ def get_my_leave_requests(
 
     leave_requests = db.query(LeaveRequest).filter(LeaveRequest.employee_profile_id == employee_profile.id).all()
     return leave_requests
+
+@router.get("/all", response_model=List[LeaveRequestSchema])
+def get_all_leave_requests(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user_with_roles([UserRole.ADMIN, UserRole.HR_OFFICER])),
+):
+    """
+    Get all leave requests (Pending, Approved, Rejected). (Admin or HR Officer only)
+    """
+    leaves = db.query(LeaveRequest).order_by(LeaveRequest.created_at.desc()).all()
+    return leaves
 
 @router.get("/pending", response_model=List[LeaveRequestSchema])
 def get_pending_leave_requests(

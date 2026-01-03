@@ -171,8 +171,6 @@ export default function EmployeeProfile() {
         <TabsList className="w-full justify-start mb-6">
           <TabsTrigger value="security">Details</TabsTrigger>
           <TabsTrigger value="private">Private Info</TabsTrigger>
-          <TabsTrigger value="resume">Resume</TabsTrigger>
-          <TabsTrigger value="salary">Salary Info</TabsTrigger>
         </TabsList>
 
         {/* Security Tab */}
@@ -287,27 +285,6 @@ export default function EmployeeProfile() {
                   <p className="font-medium text-foreground">{profileData.marital_status || "N/A"}</p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Resume Tab */}
-        <TabsContent value="resume" className="space-y-6">
-          <Card>
-            <CardContent className="p-6">
-              <p className="text-sm text-muted-foreground">
-                Your resume and professional information can be updated through HR. Contact your HR representative to make changes to your resume, skills, and professional background.
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-
-        {/* Salary Info Tab */}
-        <TabsContent value="salary" className="space-y-6">
-          <Card>
-            <CardContent className="p-8 text-center text-muted-foreground">
-              <p>Salary information is not currently available.</p>
             </CardContent>
           </Card>
         </TabsContent>

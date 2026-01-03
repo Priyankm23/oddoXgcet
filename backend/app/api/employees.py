@@ -8,8 +8,9 @@ import string
 from pathlib import Path
 from datetime import date
 from app.database import get_db
-from app.models import User, EmployeeProfile, UserRole, BankDetail, Skill, EmployeeSkill, Certification, Attendance, LeaveRequest, LeaveStatus, UserSettings
-from app.schemas import EmployeeProfile as EmployeeProfileSchema, EmployeeProfileUpdate, BankDetail as BankDetailSchema, BankDetailCreate, BankDetailUpdate, Skill as SkillSchema, EmployeeSkillCreate, Certification as CertificationSchema, CertificationCreate, CertificationUpdate, EmployeeListResponse, EmployeeCreateBasic, EmployeeBasicResponse
+from app.models import User, EmployeeProfile, UserRole, BankDetail, Skill, EmployeeSkill, Certification, Attendance, LeaveRequest, LeaveStatus, UserSettings, LeaveBalance, LeaveType,
+from decimal import Decimal
+from app.schemas import EmployeeProfile as EmployeeProfileSchema, EmployeeProfileUpdate, BankDetail as BankDetailSchema, BankDetailCreate, BankDetailUpdate, Skill as SkillSchema, EmployeeSkillCreate, Certification as CertificationSchema, CertificationCreate, CertificationUpdate, EmployeeListResponse, EmployeeCreateBasic, EmployeeBasicResponse, EmployeeProfileMeResponse
 from app.auth.security import get_password_hash
 
 from app.auth.dependencies import get_current_active_user, get_current_active_user_with_roles
@@ -115,6 +116,26 @@ def create_employee(
         # personal_email is optional, we don't set it from work_email
     )
     db.add(new_profile)
+    db.commit()
+    db.refresh(new_profile)
+    
+    # 8. Seed default Leave Balances for the current year
+    current_year = employee_in.joining_date.year
+    leave_defaults = [
+        (LeaveType.PAID, 24),
+        (LeaveType.SICK, 10),
+        (LeaveType.UNPAID, 0)
+    ]
+    for leave_type, total in leave_defaults:
+        new_balance = LeaveBalance(
+            employee_profile_id=new_profile.id,
+            leave_type=leave_type,
+            total_days=Decimal(total),
+            used_days=Decimal(0),
+            remaining_days=Decimal(total),
+            year=current_year
+        )
+        db.add(new_balance)
     db.commit()
     
     return EmployeeBasicResponse(

@@ -41,6 +41,7 @@ class EmployeeProfile(Base):
     designation = Column(String, nullable=True)
     joining_date = Column(Date, nullable=True)
     profile_picture = Column(String, nullable=True) # URL to the image
+    resume_url = Column(String, nullable=True)
 
     # Relationships
     user = relationship("User", back_populates="employee_profile")

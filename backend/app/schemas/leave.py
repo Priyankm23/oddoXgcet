@@ -16,7 +16,7 @@ class LeaveRequestBase(BaseModel):
 # Schema for creating a new leave request
 class LeaveRequestCreate(LeaveRequestBase):
     employee_profile_id: int
-    total_days: Decimal
+    total_days: Optional[Decimal] = None  # Now optional, backend will calculate if not provided
 
 # Schema for updating a leave request (by admin/approver)
 class LeaveRequestUpdate(BaseModel):
@@ -32,6 +32,7 @@ class LeaveRequest(LeaveRequestBase):
     approver_id: Optional[int] = None
     approved_at: Optional[datetime] = None
     comments: Optional[str] = None
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

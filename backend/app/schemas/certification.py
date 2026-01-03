@@ -9,6 +9,7 @@ class CertificationBase(BaseModel):
     issue_date: date
     expiry_date: Optional[date] = None
     credential_id: Optional[str] = None
+    certificate_url: Optional[str] = None
 
 # Schema for creating a new certification
 class CertificationCreate(CertificationBase):
@@ -21,6 +22,7 @@ class CertificationUpdate(BaseModel):
     issue_date: Optional[date] = None
     expiry_date: Optional[date] = None
     credential_id: Optional[str] = None
+    certificate_url: Optional[str] = None
 
 # Schema for certification data returned from the API
 class Certification(CertificationBase):

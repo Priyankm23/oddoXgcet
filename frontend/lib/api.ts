@@ -36,6 +36,24 @@ export const api = {
         return handleResponse(response);
     },
 
+    async put(endpoint: string, data: any, token?: string) {
+        const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+        };
+        if (token) {
+            headers["Authorization"] = `Bearer ${token}`;
+        }
+
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+            method: "PUT",
+            headers,
+            body: JSON.stringify(data),
+        });
+        return handleResponse(response);
+    },
+
+
+
     async postFormData(endpoint: string, formData: FormData, token?: string) {
         const headers: Record<string, string> = {};
         if (token) {

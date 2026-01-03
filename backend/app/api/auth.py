@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import User, UserSettings, UserRole, Company, EmployeeProfile
+from app.models import User, UserSettings, UserRole, Company, EmployeeProfile, LeaveBalance, LeaveType
 from app.schemas import UserCreate, User as UserSchema
 from app.schemas.token import Token
 from app.auth.security import get_password_hash, verify_password, create_access_token
@@ -11,6 +11,7 @@ from app.services.activity_service import log_activity
 import shutil
 from pathlib import Path
 from datetime import datetime
+from decimal import Decimal
 
 router = APIRouter()
 
@@ -112,6 +113,27 @@ def register_admin(
     )
     db.add(new_profile)
     db.commit()
+    db.refresh(new_profile)
+    
+    # 6. Seed default Leave Balances for the current year
+    current_year = datetime.now().year
+    leave_defaults = [
+        (LeaveType.PAID, 24),
+        (LeaveType.SICK, 10),
+        (LeaveType.UNPAID, 0)
+    ]
+    for leave_type, total in leave_defaults:
+        new_balance = LeaveBalance(
+            employee_profile_id=new_profile.id,
+            leave_type=leave_type,
+            total_days=Decimal(total),
+            used_days=Decimal(0),
+            remaining_days=Decimal(total),
+            year=current_year
+        )
+        db.add(new_balance)
+    db.commit()
+    
     db.refresh(db_user) # Refresh user to load relationships if needed
     
     log_activity(db, db_user.id, "Admin registration", f"Admin {db_user.email} registered with Company {company_name}.")
@@ -225,6 +247,27 @@ def register_hr(
     )
     db.add(new_profile)
     db.commit()
+    db.refresh(new_profile)
+    
+    # 6. Seed default Leave Balances for the current year
+    current_year = datetime.now().year
+    leave_defaults = [
+        (LeaveType.PAID, 24),
+        (LeaveType.SICK, 10),
+        (LeaveType.UNPAID, 0)
+    ]
+    for leave_type, total in leave_defaults:
+        new_balance = LeaveBalance(
+            employee_profile_id=new_profile.id,
+            leave_type=leave_type,
+            total_days=Decimal(total),
+            used_days=Decimal(0),
+            remaining_days=Decimal(total),
+            year=current_year
+        )
+        db.add(new_balance)
+    db.commit()
+    
     db.refresh(db_user) 
     
     log_activity(db, db_user.id, "HR registration", f"HR {db_user.email} registered with Company {company_name}.")

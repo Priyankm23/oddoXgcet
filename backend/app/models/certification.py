@@ -15,6 +15,7 @@ class Certification(Base):
     issue_date = Column(Date, nullable=False)
     expiry_date = Column(Date, nullable=True)
     credential_id = Column(String, nullable=True)
+    certificate_url = Column(String, nullable=True)
 
     # Relationship
     employee_profile = relationship("EmployeeProfile", back_populates="certifications")

@@ -1,4 +1,5 @@
 import enum
+from datetime import datetime
 from sqlalchemy import Column, Integer, String, Date, Enum, ForeignKey, Text, Numeric, DateTime
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -34,6 +35,8 @@ class LeaveRequest(Base):
     approver_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     approved_at = Column(DateTime, nullable=True)
     comments = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
     employee_profile = relationship("EmployeeProfile", back_populates="leave_requests")
