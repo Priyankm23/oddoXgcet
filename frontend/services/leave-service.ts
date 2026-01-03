@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 export interface LeaveRequest {
     id: number;
     employee_profile_id: number;
+    employee_code?: string; // Employee code for display (e.g., "EMP001")
     employee_name?: string; // Optional, might need to be populated by joining data or returned from backend
     leave_type: "paid" | "sick" | "unpaid";
     start_date: string;

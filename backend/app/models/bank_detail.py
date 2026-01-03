@@ -14,7 +14,10 @@ class BankDetail(Base):
     account_number = Column(String, nullable=False)
     bank_name = Column(String, nullable=False)
     ifsc_code = Column(String, nullable=False)
-    branch_name = Column(String, nullable=False)
+    branch_name = Column(String, nullable=True)  # Made optional
+    pan_number = Column(String, nullable=True)   # PAN No
+    uan_number = Column(String, nullable=True)   # UAN No
 
     # Relationship
     employee_profile = relationship("EmployeeProfile", back_populates="bank_details")
+

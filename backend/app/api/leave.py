@@ -85,9 +85,38 @@ def get_all_leave_requests(
 ):
     """
     Get all leave requests (Pending, Approved, Rejected). (Admin or HR Officer only)
+    Returns leave requests with employee_code populated.
     """
     leaves = db.query(LeaveRequest).order_by(LeaveRequest.created_at.desc()).all()
-    return leaves
+    
+    # Populate employee_code and employee_name for each leave request
+    result = []
+    for leave in leaves:
+        employee_profile = db.query(EmployeeProfile).filter(EmployeeProfile.id == leave.employee_profile_id).first()
+        employee_name = None
+        if employee_profile:
+            # Use first + last name from profile when available
+            employee_name = f"{employee_profile.first_name} {employee_profile.last_name}".strip()
+
+        leave_dict = {
+            "id": leave.id,
+            "employee_profile_id": leave.employee_profile_id,
+            "employee_code": employee_profile.employee_id if employee_profile else None,
+            "employee_name": employee_name,
+            "leave_type": leave.leave_type,
+            "start_date": leave.start_date,
+            "end_date": leave.end_date,
+            "total_days": leave.total_days,
+            "reason": leave.reason,
+            "status": leave.status,
+            "approver_id": leave.approver_id,
+            "approved_at": leave.approved_at,
+            "comments": leave.comments,
+            "created_at": leave.created_at,
+        }
+        result.append(leave_dict)
+    
+    return result
 
 @router.get("/pending", response_model=List[LeaveRequestSchema])
 def get_pending_leave_requests(
@@ -116,19 +145,24 @@ def approve_leave_request(
     if leave_request.status != LeaveStatus.PENDING:
         raise HTTPException(status_code=400, detail="Only pending leave requests can be approved")
 
-    # Update leave balance
-    leave_balance = db.query(LeaveBalance).filter(
-        LeaveBalance.employee_profile_id == leave_request.employee_profile_id,
-        LeaveBalance.leave_type == leave_request.leave_type,
-        LeaveBalance.year == leave_request.start_date.year
-    ).first()
+    # Check if this is unpaid leave (skip balance check for unpaid)
+    is_unpaid = str(leave_request.leave_type.value if hasattr(leave_request.leave_type, 'value') else leave_request.leave_type) == "unpaid"
 
-    if not leave_balance or leave_balance.remaining_days < leave_request.total_days:
-        raise HTTPException(status_code=400, detail="Insufficient leave balance to approve this request")
+    leave_balance = None
+    if not is_unpaid:
+        # Update leave balance
+        leave_balance = db.query(LeaveBalance).filter(
+            LeaveBalance.employee_profile_id == leave_request.employee_profile_id,
+            LeaveBalance.leave_type == leave_request.leave_type,
+            LeaveBalance.year == leave_request.start_date.year
+        ).first()
 
-    leave_balance.used_days += leave_request.total_days
-    leave_balance.remaining_days -= leave_request.total_days
-    db.add(leave_balance)
+        if not leave_balance or leave_balance.remaining_days < leave_request.total_days:
+            raise HTTPException(status_code=400, detail="Insufficient leave balance to approve this request")
+
+        leave_balance.used_days += leave_request.total_days
+        leave_balance.remaining_days -= leave_request.total_days
+        db.add(leave_balance)
 
     # Update leave request status
     leave_request.status = LeaveStatus.APPROVED
@@ -137,7 +171,8 @@ def approve_leave_request(
     db.add(leave_request)
     db.commit()
     db.refresh(leave_request)
-    db.refresh(leave_balance) # Refresh balance to reflect changes
+    if leave_balance:
+        db.refresh(leave_balance) # Refresh balance to reflect changes
 
     return leave_request
 

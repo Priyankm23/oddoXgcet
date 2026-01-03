@@ -75,8 +75,9 @@ function TimeOffContent() {
   }
 
   const filteredRequests = timeOffRequests.filter((req) =>
-    // Simplify search to just check if the ID exists for now as we don't have employee name populated in the simple schema
-    // In a real app, we would join with employee profile to get name
+    // Search by employee code, ID, leave type, or status
+    (req.employee_code && req.employee_code.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (req.employee_name && req.employee_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
     req.id.toString().includes(searchQuery) ||
     req.leave_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (req.status && req.status.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -101,8 +102,8 @@ function TimeOffContent() {
         <button
           onClick={() => setActiveTab("time-off")}
           className={`px-6 py-3 font-medium text-sm transition-all relative ${activeTab === "time-off"
-              ? "text-foreground border-b-2 border-primary"
-              : "text-muted-foreground hover:text-foreground"
+            ? "text-foreground border-b-2 border-primary"
+            : "text-muted-foreground hover:text-foreground"
             }`}
         >
           Time Off
@@ -110,8 +111,8 @@ function TimeOffContent() {
         <button
           onClick={() => setActiveTab("allocation")}
           className={`px-6 py-3 font-medium text-sm transition-all relative ${activeTab === "allocation"
-              ? "text-foreground border-b-2 border-primary"
-              : "text-muted-foreground hover:text-foreground"
+            ? "text-foreground border-b-2 border-primary"
+            : "text-muted-foreground hover:text-foreground"
             }`}
         >
           Allocation
@@ -159,7 +160,8 @@ function TimeOffContent() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border bg-muted/50">
-                      <th className="px-4 py-4 text-left font-semibold text-foreground">Employee ID</th>
+                      <th className="px-4 py-4 text-left font-semibold text-foreground">Employee Code</th>
+                      <th className="px-4 py-4 text-left font-semibold text-foreground">Employee Name</th>
                       <th className="px-4 py-4 text-left font-semibold text-foreground">Start Date</th>
                       <th className="px-4 py-4 text-left font-semibold text-foreground">End Date</th>
                       <th className="px-4 py-4 text-left font-semibold text-foreground">Type</th>
@@ -171,12 +173,13 @@ function TimeOffContent() {
                   <tbody>
                     {loading ? (
                       <tr>
-                        <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">Loading...</td>
+                        <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">Loading...</td>
                       </tr>
                     ) : filteredRequests.length > 0 ? (
                       filteredRequests.map((req) => (
                         <tr key={req.id} className="border-b border-border hover:bg-muted/30 transition">
-                          <td className="px-4 py-4 font-medium text-foreground">#{req.employee_profile_id}</td>
+                          <td className="px-4 py-4 font-medium text-foreground">{req.employee_code ?? "N/A"}</td>
+                          <td className="px-4 py-4 text-foreground">{req.employee_name ?? "N/A"}</td>
                           <td className="px-4 py-4 text-foreground">{req.start_date}</td>
                           <td className="px-4 py-4 text-foreground">{req.end_date}</td>
                           <td className="px-4 py-4">
@@ -189,10 +192,10 @@ function TimeOffContent() {
                             {req.status && (
                               <Badge
                                 className={`capitalize ${req.status === "approved"
-                                    ? "bg-green-500/10 text-green-700 border-green-200"
-                                    : req.status === "rejected"
-                                      ? "bg-red-500/10 text-red-700 border-red-200"
-                                      : "bg-yellow-500/10 text-yellow-700 border-yellow-200"
+                                  ? "bg-green-500/10 text-green-700 border-green-200"
+                                  : req.status === "rejected"
+                                    ? "bg-red-500/10 text-red-700 border-red-200"
+                                    : "bg-yellow-500/10 text-yellow-700 border-yellow-200"
                                   }`}
                               >
                                 {req.status}
@@ -223,7 +226,7 @@ function TimeOffContent() {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
+                        <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
                           No time off requests found
                         </td>
                       </tr>

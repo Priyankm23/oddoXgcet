@@ -22,8 +22,9 @@ export default function EmployeeDashboardLayout({
 
   const isCheckedIn = status === 'checked-in'
 
-  const [companyLogo] = useState("/generic-company-logo.png")
-  const [userAvatar] = useState("/diverse-user-avatars.png")
+  const [companyLogo, setCompanyLogo] = useState("/generic-company-logo.png")
+  const [companyName, setCompanyName] = useState("Dayflow")
+  const [userAvatar, setUserAvatar] = useState("/diverse-user-avatars.png")
   const [userName, setUserName] = useState("Employee")
   const pathname = usePathname()
 
@@ -34,29 +35,31 @@ export default function EmployeeDashboardLayout({
     }
   }, [attendanceError])
 
+  // Fetch user profile data for avatar, name, and company logo
   useEffect(() => {
-    const fetchUser = async () => {
+    const fetchProfile = async () => {
       try {
         const token = localStorage.getItem("token")
-        if (token) {
-          const userData = await api.get("/auth/users/me", token)
-          // Assuming userData has employee_profile, otherwise falls back to email or generic
-          // The /users/me endpoint returns UserSchema which might need to include profile or we fetch profile separately.
-          // Let's assume for now we use email or if available profile name.
-          // Actually UserSchema in backend has: id, email, is_active, role.
-          // To get name we might need relationship loading or fetch profile.
-          // Let's check if UserSchema includes 'employee_profile'.
-          // If not, we might display email for now or fetch /employees/me if exists.
-          // Checking backend/app/schemas/user.py would be ideal but let's just use email as fallback.
-          if (userData.email) {
-            setUserName(userData.email.split('@')[0])
+        if (!token) return
+
+        const profile = await api.get("/employees/me", token)
+        if (profile) {
+          setUserName(`${profile.first_name} ${profile.last_name}`)
+          if (profile.profile_picture) {
+            setUserAvatar(profile.profile_picture)
+          }
+          if (profile.company_logo) {
+            setCompanyLogo(profile.company_logo)
+          }
+          if (profile.company_name) {
+            setCompanyName(profile.company_name)
           }
         }
-      } catch (e) {
-        console.error(e)
+      } catch (error) {
+        console.error("Failed to fetch profile:", error)
       }
     }
-    fetchUser()
+    fetchProfile()
   }, [])
 
   const handleLogout = async () => {
@@ -109,7 +112,7 @@ export default function EmployeeDashboardLayout({
                 alt="Company Logo"
                 className="w-10 h-10 rounded-lg object-cover"
               />
-              <span className="text-lg font-bold text-foreground hidden sm:block">Dayflow</span>
+              <span className="text-lg font-bold text-foreground hidden sm:block">{companyName}</span>
             </div>
 
             <div className="hidden md:flex items-center gap-2 bg-muted/30 p-1 rounded-xl">

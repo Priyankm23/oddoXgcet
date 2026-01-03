@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Response
 from sqlalchemy.orm import Session
-from sqlalchemy import extract
+from sqlalchemy import extract, exc
 from typing import List
 import shutil
 import secrets
@@ -274,9 +274,20 @@ def update_employee_profile(
     for field, value in update_data.items():
         setattr(db_profile, field, value)
 
-    db.add(db_profile)
-    db.commit()
-    db.refresh(db_profile)
+    try:
+        db.add(db_profile)
+        db.commit()
+        db.refresh(db_profile)
+    except exc.IntegrityError as e:
+        db.rollback()
+        error_msg = str(e.orig)
+        if "personal_email" in error_msg.lower() or "UNIQUE constraint failed: employee_profiles.personal_email" in error_msg:
+            raise HTTPException(status_code=400, detail="This personal email is already registered to another employee")
+        raise HTTPException(status_code=400, detail="Duplicate value detected. Please check your input.")
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    
     return db_profile
 
 @router.post("/me/profile-picture", response_model=EmployeeProfileSchema)

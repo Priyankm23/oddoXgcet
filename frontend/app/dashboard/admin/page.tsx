@@ -31,13 +31,18 @@ interface Employee {
   company?: string
   manager?: string
   location?: string
-  // Bank Details
-  accountNumber?: string
-  bankName?: string
-  ifscCode?: string
-  panNo?: string
-  uanNo?: string
   empCode?: string
+}
+
+interface BankDetails {
+  id: number
+  employee_profile_id: number
+  account_number: string
+  bank_name: string
+  ifsc_code: string
+  branch_name?: string
+  pan_number?: string
+  uan_number?: string
 }
 
 // Mock employee data removed - fetching from API
@@ -120,6 +125,8 @@ export default function AdminDashboard() {
   const [error, setError] = useState("")
   const [createdCredentials, setCreatedCredentials] = useState<{employee_id: string, password: string, work_email: string} | null>(null)
   const [showPassword, setShowPassword] = useState(false)
+  const [bankDetails, setBankDetails] = useState<BankDetails | null>(null)
+  const [loadingBankDetails, setLoadingBankDetails] = useState(false)
 
   const fetchEmployees = async () => {
     try {
@@ -176,9 +183,33 @@ export default function AdminDashboard() {
       emp.email.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
-  const handleEmployeeClick = (employee: Employee) => {
+  const handleEmployeeClick = async (employee: Employee) => {
     setSelectedEmployee(employee)
+    setBankDetails(null)
     setIsProfileOpen(true)
+    
+    // Fetch bank details for this employee
+    try {
+      setLoadingBankDetails(true)
+      const token = localStorage.getItem("token")
+      const response = await fetch(`http://127.0.0.1:8000/api/v1/employees/${employee.id}/bank-details`, {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        // API returns array, get first item if exists
+        if (data && data.length > 0) {
+          setBankDetails(data[0])
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching bank details:", err)
+    } finally {
+      setLoadingBankDetails(false)
+    }
   }
 
   const handleNewEmployee = () => {
@@ -441,32 +472,36 @@ export default function AdminDashboard() {
 
                 <TabsContent value="salary" className="space-y-4 mt-4">
                   <h3 className="font-semibold text-lg mb-4">Bank Details</h3>
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label className="text-muted-foreground">Account Number</Label>
-                      <p className="font-medium">{selectedEmployee.accountNumber || "N/A"}</p>
+                  {loadingBankDetails ? (
+                    <p className="text-muted-foreground">Loading bank details...</p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label className="text-muted-foreground">Account Number</Label>
+                        <p className="font-medium">{bankDetails?.account_number || "N/A"}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-muted-foreground">Bank Name</Label>
+                        <p className="font-medium">{bankDetails?.bank_name || "N/A"}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-muted-foreground">IFSC Code</Label>
+                        <p className="font-medium">{bankDetails?.ifsc_code || "N/A"}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-muted-foreground">PAN No</Label>
+                        <p className="font-medium">{bankDetails?.pan_number || "N/A"}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-muted-foreground">UAN No</Label>
+                        <p className="font-medium">{bankDetails?.uan_number || "N/A"}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-muted-foreground">Emp Code</Label>
+                        <p className="font-medium">{selectedEmployee.empCode || "N/A"}</p>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label className="text-muted-foreground">Bank Name</Label>
-                      <p className="font-medium">{selectedEmployee.bankName || "N/A"}</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-muted-foreground">IFSC Code</Label>
-                      <p className="font-medium">{selectedEmployee.ifscCode || "N/A"}</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-muted-foreground">PAN No</Label>
-                      <p className="font-medium">{selectedEmployee.panNo || "N/A"}</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-muted-foreground">UAN No</Label>
-                      <p className="font-medium">{selectedEmployee.uanNo || "N/A"}</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-muted-foreground">Emp Code</Label>
-                      <p className="font-medium">{selectedEmployee.empCode || "N/A"}</p>
-                    </div>
-                  </div>
+                  )}
                 </TabsContent>
 
                 <TabsContent value="security" className="space-y-4 mt-4">

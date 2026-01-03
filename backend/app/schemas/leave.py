@@ -27,6 +27,8 @@ class LeaveRequestUpdate(BaseModel):
 class LeaveRequest(LeaveRequestBase):
     id: int
     employee_profile_id: int
+    employee_code: Optional[str] = None  # Employee code for display (e.g., "EMP001")
+    employee_name: Optional[str] = None  # Employee full name for display
     total_days: Decimal
     status: LeaveStatus
     approver_id: Optional[int] = None

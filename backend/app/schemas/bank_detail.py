@@ -6,7 +6,9 @@ class BankDetailBase(BaseModel):
     account_number: str
     bank_name: str
     ifsc_code: str
-    branch_name: str
+    branch_name: Optional[str] = None
+    pan_number: Optional[str] = None
+    uan_number: Optional[str] = None
 
 # Schema for creating a new bank detail
 class BankDetailCreate(BankDetailBase):
@@ -18,6 +20,8 @@ class BankDetailUpdate(BaseModel):
     bank_name: Optional[str] = None
     ifsc_code: Optional[str] = None
     branch_name: Optional[str] = None
+    pan_number: Optional[str] = None
+    uan_number: Optional[str] = None
 
 # Schema for bank detail data returned from the API
 class BankDetail(BankDetailBase):
@@ -26,3 +30,4 @@ class BankDetail(BankDetailBase):
 
     class Config:
         from_attributes = True
+
